@@ -1,56 +1,129 @@
-# 1. 目标平台与机型 (小米 AX3000T 大分区 U-Boot)
-CONFIG_TARGET_mediatek=y
-CONFIG_TARGET_mediatek_filogic=y
-CONFIG_TARGET_mediatek_filogic_DEVICE_xiaomi_mi-router-ax3000t-ubootmod=y
+name: Build Xiaomi AX3000T ImmortalWrt
 
-# 2. LuCI 基础界面与 Argon 现代化主题
-CONFIG_PACKAGE_luci=y
-CONFIG_PACKAGE_luci-base=y
-CONFIG_PACKAGE_luci-compat=y
-CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
-CONFIG_PACKAGE_luci-theme-argon=y
+on:
+  workflow_dispatch:
+    inputs:
+      manual:
+        description: 'Manual Trigger'
+        default: 'true'
 
-# 3. 启用 momo 界面（不预编译 sing-box core，刷机后在线一键下载）
-CONFIG_PACKAGE_luci-app-momo=y
-CONFIG_PACKAGE_luci-i18n-momo-zh-cn=y
-# CONFIG_PACKAGE_sing-box is not set
+env:
+  REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
+  REPO_BRANCH: master
+  CONFIG_FILE: ax3000t.config
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  UPLOAD_FIRMWARE: true
+  UPLOAD_RELEASE: true
+  TZ: Asia/Shanghai
 
-# 4. 透明代理与路由必需的内核网络模块（底盘驱动）
-CONFIG_PACKAGE_kmod-tun=y
-CONFIG_PACKAGE_kmod-inet-diag=y
-CONFIG_PACKAGE_kmod-nft-tproxy=y
-CONFIG_PACKAGE_ip-full=y
-CONFIG_PACKAGE_iptables-nft=y
+jobs:
+  build:
+    runs-on: ubuntu-22.04
 
-# 5. 核心在线下载与 SSL 校验必备组件（DDNS 和 momo 共用）
-CONFIG_PACKAGE_ca-bundle=y
-CONFIG_PACKAGE_ca-certificates=y
-CONFIG_PACKAGE_curl=y
-CONFIG_PACKAGE_tar=y
-CONFIG_PACKAGE_gzip=y
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
 
-# 6. MT7981B 硬件加速 (TurboACC)
-CONFIG_PACKAGE_kmod-crypto-kpp=y
-CONFIG_PACKAGE_kmod-crypto-acompress=y
-CONFIG_PACKAGE_luci-app-turboacc=y
-CONFIG_PACKAGE_luci-app-turboacc_INCLUDE_OFFLOADING=y
-CONFIG_PACKAGE_luci-app-turboacc_INCLUDE_SHORTCUT_FE=y
-CONFIG_PACKAGE_luci-app-turboacc_INCLUDE_BBR_CCA=y
+    - name: Free Disk Space & Initialization Environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo docker image prune -a -f
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+          bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib \
+          git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev \
+          libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev \
+          libssl-dev libtool lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python3 \
+          python3-pip python3-ply python3-docutils qemu-utils rsync scons squashfs-tools subversion swig texinfo \
+          uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+        sudo mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
 
-# 7. 常用实用工具组件
-CONFIG_PACKAGE_luci-app-ttyd=y
-CONFIG_PACKAGE_luci-i18n-ttyd-zh-cn=y
-CONFIG_PACKAGE_luci-app-upnp=y
-CONFIG_PACKAGE_luci-i18n-upnp-zh-cn=y
-CONFIG_PACKAGE_luci-app-autoreboot=y
-CONFIG_PACKAGE_luci-i18n-autoreboot-zh-cn=y
-CONFIG_PACKAGE_htop=y
-CONFIG_PACKAGE_nano=y
-CONFIG_PACKAGE_openssh-sftp-server=y
+    - name: Clone Source Code
+      working-directory: /workdir
+      run: |
+        df -hT $PWD
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-# 8. 动态域名解析 (DDNS) 及其核心服务脚本
-CONFIG_PACKAGE_luci-app-ddns=y
-CONFIG_PACKAGE_luci-i18n-ddns-zh-cn=y
-CONFIG_PACKAGE_ddns-scripts=y
-CONFIG_PACKAGE_ddns-scripts-services=y
-CONFIG_PACKAGE_ddns-scripts-cloudflare=y
+    - name: Run DIY Part 1 (Add momo repo)
+      run: |
+        chmod +x $DIY_P1_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+    - name: Update & Install Feeds
+      run: |
+        cd openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: Run DIY Part 2 (Config & Tweaks)
+      run: |
+        [ -e $CONFIG_FILE ] && cp $CONFIG_FILE openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    - name: Download Dependency Packages
+      id: package
+      run: |
+        cd openwrt
+        make defconfig
+        make download -j8
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+
+    - name: Compile the Firmware
+      id: compile
+      run: |
+        cd openwrt
+        echo -e "$(nproc) thread compile"
+        make -j$(nproc) || make -j1 || make -j1 V=s
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Organize Files & Generate Checksums
+      id: organize
+      if: steps.compile.outputs.status == 'success' && !cancelled()
+      run: |
+        cd openwrt/bin/targets/*/*
+        rm -rf packages
+        sha256sum *ubootmod*.bin > sha256sums.txt
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      if: steps.organize.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      with:
+        name: AX3000T_ImmortalWrt_${{ github.run_id }}
+        path: ${{ env.FIRMWARE }}
+
+    - name: Generate Release Tag
+      id: tag
+      if: env.UPLOAD_RELEASE == 'true' && steps.compile.outputs.status == 'success' && !cancelled()
+      run: |
+        echo "release_tag=AX3000T-$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Publish to GitHub Release
+      uses: softprops/action-gh-release@v2
+      if: steps.tag.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        body: |
+          ### 小米 AX3000T ImmortalWrt 固件 (Linux 6.6)
+          * **源码基底**：`padavanonly/immortalwrt-mt798x-6.6`
+          * **适用布局**：大分区 U-Boot（刷入 `*ax3000t-ubootmod-squashfs-sysupgrade.bin`）
+          * **核心组件**：Argon 主题、OpenWrt-momo、Turbo ACC 硬件加速、TTYD 终端免密
+          * **默认管理 IP**：`192.168.31.1`（用户名: `root`，密码无）
+          * **默认 Wi-Fi**：已开启（无需插网线即可初始化，默认无密码）
+        files: ${{ env.FIRMWARE }}/*
