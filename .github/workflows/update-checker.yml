@@ -1,0 +1,46 @@
+name: Update Checker
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 每天北京时间早上 7:00 自动检查一次上游是否有更新
+    - cron: '0 23 * * *'
+
+env:
+  REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
+  REPO_BRANCH: openwrt-24.10-6.6
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Get Commit Hash
+      id: getHash
+      run: |
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH .
+        echo "commitHash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+    - name: Compare Commit Hash
+      id: checkHash
+      run: |
+        [ -f .commitHash ] && savedHash=$(cat .commitHash) || savedHash=""
+        if [ "$savedHash" != "${{ steps.getHash.outputs.commitHash }}" ]; then
+            echo "${{ steps.getHash.outputs.commitHash }}" > .commitHash
+            echo "updated=true" >> $GITHUB_OUTPUT
+        else
+            echo "updated=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Trigger Build Workflow
+      if: steps.checkHash.outputs.updated == 'true'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'build-ax3000t.yml',
+            ref: context.ref
+          })
