@@ -67,15 +67,12 @@ jobs:
     - name: Run DIY Part 2 (Config & Tweaks)
       run: |
         cd openwrt
-        # 1. 精准复制 237 的 AX3000T 官方 defconfig（文件名无 .config 后缀，杜绝缺失宏报错）
+        # 1. 直接注入自定义 ax3000t.config
+        cp $GITHUB_WORKSPACE/$CONFIG_FILE .config
+        # 2. 查找是否有匹配的 defconfig 补充进配置
         if [ -f defconfig/mt7981-ax3000t ]; then
-            cp defconfig/mt7981-ax3000t .config
-        elif [ -f defconfig/mt7981-ax3000t.config ]; then
-            cp defconfig/mt7981-ax3000t.config .config
-        else
-            cp $GITHUB_WORKSPACE/$CONFIG_FILE .config
+            cat defconfig/mt7981-ax3000t >> .config
         fi
-        # 2. 追加你的个性化插件配置 (momo, argon, ddns, autoupdate 等)
         cat $GITHUB_WORKSPACE/$CONFIG_FILE >> .config
         # 3. 运行个性化调整脚本
         chmod +x $GITHUB_WORKSPACE/$DIY_P2_SH
@@ -85,7 +82,7 @@ jobs:
       id: package
       run: |
         cd openwrt
-        make defconfig
+        yes "" | make defconfig
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
