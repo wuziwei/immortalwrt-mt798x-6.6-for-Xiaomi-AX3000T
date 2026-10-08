@@ -67,14 +67,7 @@ jobs:
     - name: Run DIY Part 2 (Config & Tweaks)
       run: |
         cd openwrt
-        # 1. 直接注入自定义 ax3000t.config
         cp $GITHUB_WORKSPACE/$CONFIG_FILE .config
-        # 2. 查找是否有匹配的 defconfig 补充进配置
-        if [ -f defconfig/mt7981-ax3000t ]; then
-            cat defconfig/mt7981-ax3000t >> .config
-        fi
-        cat $GITHUB_WORKSPACE/$CONFIG_FILE >> .config
-        # 3. 运行个性化调整脚本
         chmod +x $GITHUB_WORKSPACE/$DIY_P2_SH
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
