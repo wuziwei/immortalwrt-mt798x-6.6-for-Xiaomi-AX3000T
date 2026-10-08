@@ -4,11 +4,3 @@ git clone --depth 1 https://github.com/nikkinikki-org/OpenWrt-momo package/luci-
 
 # 2. 拉取在线升级插件
 git clone --depth 1 -b master https://github.com/Hyy2001X/AutoBuild-Packages.git package/autobuild
-
-# 3. 修复 padavanonly 源码中 MTK_WIFI_CHIP_OFFLINE 编译报错
-for file in $(find target/linux/mediatek/ -name "mtk_eth_soc.c" 2>/dev/null); do
-    sed -i '1i #ifndef MTK_WIFI_CHIP_OFFLINE\n#define MTK_WIFI_CHIP_OFFLINE 0x10\n#endif' "$file"
-done
-for patch in $(find target/linux/mediatek/ -name "*.patch" 2>/dev/null); do
-    sed -i 's/case MTK_WIFI_CHIP_OFFLINE:/default:/g' "$patch" 2>/dev/null || true
-done
