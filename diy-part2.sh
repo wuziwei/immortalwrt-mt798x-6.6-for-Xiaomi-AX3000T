@@ -11,8 +11,3 @@ sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/M
 
 # 4. TTYD 网页终端免密直登
 sed -i 's/\/bin\/login/\/bin\/login -f root/g' feeds/packages/utils/ttyd/files/ttyd.config
-
-# 5. 写入在线更新配置，绑定你的 GitHub 仓库地址
-cat >> package/base-files/files/etc/openwrt_release <<EOF
-DISTRIB_GITHUB="wuziwei/immortalwrt-mt798x-6.6-for-Xiaomi-AX3000T"
-EOF
