@@ -6,6 +6,8 @@ on:
       manual:
         description: 'Manual Trigger'
         default: 'true'
+  schedule:
+    - cron: '0 20 1 * *'
 
 env:
   REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
