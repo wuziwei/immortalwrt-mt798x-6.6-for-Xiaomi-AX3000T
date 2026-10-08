@@ -6,8 +6,6 @@ on:
       manual:
         description: 'Manual Trigger'
         default: 'true'
-  schedule:
-    - cron: '0 20 1 * *'
 
 env:
   REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
@@ -54,7 +52,7 @@ jobs:
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: Run DIY Part 1 (Add momo repo)
+    - name: Run DIY Part 1 (Add Feeds & Packages)
       run: |
         chmod +x $DIY_P1_SH
         cd openwrt
@@ -69,15 +67,15 @@ jobs:
     - name: Run DIY Part 2 (Config & Tweaks)
       run: |
         cd openwrt
-        # 1. 优先载入 padavanonly 官方为 AX3000T 适配的完整 defconfig 基底
-        if [ -f defconfig/mt7981-ax3000t.config ]; then
+        # 1. 精准复制 237 的 AX3000T 官方 defconfig（文件名无 .config 后缀，杜绝缺失宏报错）
+        if [ -f defconfig/mt7981-ax3000t ]; then
+            cp defconfig/mt7981-ax3000t .config
+        elif [ -f defconfig/mt7981-ax3000t.config ]; then
             cp defconfig/mt7981-ax3000t.config .config
-        elif [ -f defconfig/mt7981-ax3000t-ubootmod.config ]; then
-            cp defconfig/mt7981-ax3000t-ubootmod.config .config
         else
             cp $GITHUB_WORKSPACE/$CONFIG_FILE .config
         fi
-        # 2. 追加自定义插件配置 (momo, argon, ddns, autoupdate 等)
+        # 2. 追加你的个性化插件配置 (momo, argon, ddns, autoupdate 等)
         cat $GITHUB_WORKSPACE/$CONFIG_FILE >> .config
         # 3. 运行个性化调整脚本
         chmod +x $GITHUB_WORKSPACE/$DIY_P2_SH
@@ -106,7 +104,10 @@ jobs:
       run: |
         cd openwrt/bin/targets/*/*
         rm -rf packages
-        sha256sum *ubootmod*.bin > sha256sums.txt
+        # 仅保留刷机必需的 ubootmod 固件并生成 sha256 校验文件
+        for file in $(ls *ubootmod*sysupgrade.bin 2>/dev/null); do
+            sha256sum "$file" > "${file}.sha256"
+        done
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
@@ -133,9 +134,9 @@ jobs:
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body: |
           ### 小米 AX3000T ImmortalWrt 固件 (Linux 6.6)
-          * **源码基底**：`padavanonly/immortalwrt-mt798x-6.6`
-          * **适用布局**：大分区 U-Boot（刷入 `*ax3000t-ubootmod-squashfs-sysupgrade.bin`）
-          * **核心组件**：Argon 主题、OpenWrt-momo、Turbo ACC 硬件加速、TTYD 终端免密
-          * **默认管理 IP**：`192.168.31.1`（用户名: `root`，密码无）
+          * **源码基底**：`padavanonly/immortalwrt-mt798x-6.6` (分支: `openwrt-24.10-6.6`)
+          * **适用布局**：大分区 U-Boot（请刷入 `*ax3000t-ubootmod-squashfs-sysupgrade.bin`）
+          * **核心组件**：Argon 主题、OpenWrt-momo、Turbo ACC 硬件加速、DDNS、AutoUpdate 在线更新
+          * **默认管理 IP**：`192.168.6.1`（用户名: `root`，密码无）
           * **默认 Wi-Fi**：已开启（无需插网线即可初始化，默认无密码）
         files: ${{ env.FIRMWARE }}/*
