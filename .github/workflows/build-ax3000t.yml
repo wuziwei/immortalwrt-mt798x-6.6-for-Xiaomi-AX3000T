@@ -118,6 +118,6 @@ jobs:
           * **适用机型**：小米路由器 AX3000T（大分区 U-Boot 专属）
           * **刷入文件**：`*ax3000t-ubootmod-squashfs-sysupgrade.bin`
           * **后台管理**：`192.168.6.1`（用户名: `root`，默认无密码）
-          * **预装插件**：Argon 主题、OpenWrt-momo、Turbo ACC 硬件加速、DDNS、AutoUpdate 在线更新
+          * **预装插件**：Argon 主题、OpenWrt-momo、Turbo ACC 硬件加速、DDNS
           * **无线状态**：开机默认已开启 Wi-Fi
         files: ${{ env.FIRMWARE }}/*
