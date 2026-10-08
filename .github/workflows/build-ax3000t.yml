@@ -68,9 +68,19 @@ jobs:
 
     - name: Run DIY Part 2 (Config & Tweaks)
       run: |
-        [ -e $CONFIG_FILE ] && cp $CONFIG_FILE openwrt/.config
-        chmod +x $DIY_P2_SH
         cd openwrt
+        # 1. 优先载入 padavanonly 官方为 AX3000T 适配的完整 defconfig 基底
+        if [ -f defconfig/mt7981-ax3000t.config ]; then
+            cp defconfig/mt7981-ax3000t.config .config
+        elif [ -f defconfig/mt7981-ax3000t-ubootmod.config ]; then
+            cp defconfig/mt7981-ax3000t-ubootmod.config .config
+        else
+            cp $GITHUB_WORKSPACE/$CONFIG_FILE .config
+        fi
+        # 2. 追加自定义插件配置 (momo, argon, ddns, autoupdate 等)
+        cat $GITHUB_WORKSPACE/$CONFIG_FILE >> .config
+        # 3. 运行个性化调整脚本
+        chmod +x $GITHUB_WORKSPACE/$DIY_P2_SH
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
     - name: Download Dependency Packages
