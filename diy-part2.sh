@@ -13,6 +13,15 @@ sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/M
 sed -i 's/\/bin\/login/\/bin\/login -f root/g' feeds/packages/utils/ttyd/files/ttyd.config
 
 # 5. 编译专属超轻量 sing-box 1.15 核心（纯 Go 系统协议栈，无 gVisor，专为 hy2 + tailscale 定制）
+if ! command -v go &>/dev/null || [[ "$(go version 2>&1)" != *"go1.2"* ]]; then
+  echo "==> Setting up Go 1.23..."
+  curl -fsSL https://dl.google.com/go/go1.23.2.linux-amd64.tar.gz -o /tmp/go1.23.tar.gz
+  sudo tar -C /usr/local -xzf /tmp/go1.23.tar.gz
+  rm -f /tmp/go1.23.tar.gz
+  export PATH=/usr/local/go/bin:$PATH
+fi
+echo "==> Go environment: $(go version 2>&1 || echo 'Go not found')"
+
 mkdir -p files/usr/bin
 echo "==> Cloning sing-box v1.15.0-alpha.12..."
 rm -rf /tmp/sing-box-src
