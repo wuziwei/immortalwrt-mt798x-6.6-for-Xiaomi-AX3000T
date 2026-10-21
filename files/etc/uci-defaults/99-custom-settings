@@ -1,0 +1,45 @@
+#!/bin/sh
+
+# 1. 开启网络封包调度加速与基础网络调优
+uci -q batch <<EOF
+set network.globals.packet_steering='1'
+commit network
+EOF
+
+# 2. 预置 udpxy 4K 极速缓存参数 (2MB 缓冲区 + 128 批处理，消灭 4K 50fps 丢包与微卡顿)
+uci -q batch <<EOF
+set udpxy.@udpxy[0].disabled='0'
+set udpxy.@udpxy[0].port='4022'
+set udpxy.@udpxy[0].buffer_size='2097152'
+set udpxy.@udpxy[0].buffer_messages='128'
+set udpxy.@udpxy[0].buffer_time='2'
+set udpxy.@udpxy[0].max_clients='50'
+commit udpxy
+EOF
+
+# 3. 预置 momo 运行时健康堆内存上限 (90MiB，平衡内存安全与 GC 性能)
+uci -q batch <<EOF
+set momo.procd.env_go_mem_limit='90MiB'
+commit momo
+EOF
+
+# 4. 优化开机 rc.local：提升队列长度、防范 IPTV 组播泛洪打爆 Wi-Fi 空口
+cat << 'RCLOCAL' > /etc/rc.local
+# Put your custom commands here that should be executed once
+# the system init finished. By default this file does nothing.
+
+# 1. 提升核心网卡队列深度为 5000，消除突发 30Mbps 码流丢包
+ip link set br-lan txqueuelen 5000 2>/dev/null
+ip link set rax0 txqueuelen 5000 2>/dev/null
+ip link set ra0 txqueuelen 5000 2>/dev/null
+
+# 2. Wi-Fi 无线接口屏蔽 IPTV 组播泛洪（由 udpxy 单播或有线端口传输，保护 5GHz/2.4GHz 芯片算力）
+for iface in ra0 rax0; do
+    echo 0 > /sys/class/net/br-lan/brif/$iface/multicast_router 2>/dev/null
+    echo 0 > /sys/class/net/br-lan/brif/$iface/multicast_to_unicast 2>/dev/null
+done
+
+exit 0
+RCLOCAL
+
+exit 0

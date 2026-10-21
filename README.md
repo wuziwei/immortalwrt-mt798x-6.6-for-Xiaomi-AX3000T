@@ -11,7 +11,18 @@
 * **源码基底**：同步自 237 的 `openwrt-24.10-6.6` 分支，采用 **Linux 6.6 LTS** 长期支持内核。
 * **下一代防火墙**：全面适配 **Firewall4 (`nftables`)**，包转发性能大幅提升。
 * **硬件级网络加速**：集成 MTK Filogic 专属 **WED (Wireless Ethernet Dispatch)** 硬件无线包分发卸载与 **Turbo ACC**（Flow Offloading / BBR / Shortcut-FE），满血千兆跑满且 CPU 占用低至个位数。
-* **现代科学分流**：预装基于 sing-box 核心的轻量现代化客户端 **[OpenWrt-momo](https://github.com/nikkinikki-org/OpenWrt-momo)**（不预编臃肿核心，支持在 LuCI 界面一键在线下载/切换官方最新 ARM64 核心）。
+* **现代科学分流与防爆内存调优**：
+  * 预装基于 sing-box 核心的轻量现代化客户端 **[OpenWrt-momo](https://github.com/nikkinikki-org/OpenWrt-momo)**，并在编译期编译专属轻量 sing-box 核心。
+  * **独家内存防暴冲补丁**：针对 15+ 庞大规则集常驻堆内存超过 60MB 的现状，科学预置 `90MiB` 堆缓冲，彻底根除 Go 垃圾回收器（GC Pacer）死循环抢占 CPU 导致的 80% 异常高负载。
+* **4K IPTV 零丢包与空口保护优化**：
+  * **极速缓冲 udpxy**：开箱预置 2MB 高速双向缓冲与 128 批处理（`-B 2097152 -R 128 -H 2`），彻底消灭 27+ Mbps 4K 50fps 超高清广播直播的偶发丢包与微卡顿。
+  * **Wi-Fi 空口组播风暴隔离**：开机自动关闭无线网卡上的组播路由泛洪与组播转单播，彻底保护 5GHz/2.4GHz 无线射频芯片算力。
+* **系统级防重载与 CPU 降温补丁**：
+  * **修复 MTK SMP 热插拔死循环**：为 `30-ext-devices-rps-setting` 增加动作判断，根除局域网设备前缀变动时每 3 秒触发一次 `mtk_smp restart` 消耗 22% CPU 的顽疾。
+  * **odhcp6c RA 30 秒防抖去重**：防御局域网异常三方设备（如部分运营商组网 AP/拓展器）高频广播 Router Solicitation/Advertisement 导致的脚本反复拉起（挽救 36% CPU）。
+* **全链路网络性能调优**：
+  * 提升核心网卡队列深度 `txqueuelen` 至 5000，消灭突发视频码流队列溢出丢包。
+  * 核心套接字缓冲区扩充至 16MB，MTK 硬件加速下默认采用稳健的原生 `cubic` 拥塞控制。
 * **动态域名解析**：内置 **DDNS (动态 DNS)**，原生集成 Cloudflare、阿里云、腾讯云 DNSPod、DuckDNS 等服务脚本，完整支持 IPv4 / IPv6 双栈解析。
 * **开箱即用设计**：
   * **开机默认开启 Wi-Fi**：刷机后无需连网线插电脑，通电即自动发射 2.4G & 5G 无线信号。

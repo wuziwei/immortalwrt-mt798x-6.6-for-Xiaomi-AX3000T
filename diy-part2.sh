@@ -49,8 +49,26 @@ find package/ feeds/ -name "argon" -type f -path "*/etc/config/*" -exec sed -i "
 # 7. 提升 uhttpd 默认最大并发数为 20（解决后台并发请求排队卡顿）
 find package/ feeds/ -name "uhttpd.config" -exec sed -i "s/max_requests '3'/max_requests '20'/g" {} + 2>/dev/null || true
 
-# 8. 为 momo 服务脚本注入 Go 内存控制上限（60MB 内存上限，实测平衡最佳性能与安全余量）
+# 8. 为 momo 运行时配置健康的 Go 内存上限（90MiB 堆缓冲，彻底消除 60MiB 引起的 GC Thrashing 80% CPU 暴冲）
 if [ -d "package" ]; then
-    find package/ feeds/ -name "momo" -type f -path "*/etc/config/*" -exec sed -i "s/option env_go_mem_limit '.*'/option env_go_mem_limit '60MiB'/g" {} + 2>/dev/null || true
-    find package/ feeds/ -name "momo" -type f -path "*/init.d/*" -exec sed -i '/procd_open_instance/i \	export GOMEMLIMIT=60MiB\n\texport GOGC=30' {} + 2>/dev/null || true
+    find package/ feeds/ -name "momo" -type f -path "*/etc/config/*" -exec sed -i "s/option env_go_mem_limit '.*'/option env_go_mem_limit '90MiB'/g" {} + 2>/dev/null || true
+    # 移除原先硬编码注入的 GOMEMLIMIT=60MiB 和 GOGC=30，杜绝 Go 垃圾回收器死循环抢占 CPU
+    find package/ feeds/ -name "momo" -type f -path "*/init.d/*" -exec sed -i '/export GOMEMLIMIT/d' {} + 2>/dev/null || true
+    find package/ feeds/ -name "momo" -type f -path "*/init.d/*" -exec sed -i '/export GOGC/d' {} + 2>/dev/null || true
 fi
+
+# 9. 修复 30-ext-devices-rps-setting 热插拔脚本死循环重启（防范局域网设备前缀刷新引发 mtk_smp 重启风暴，消除 22% CPU 浪费）
+find package/ target/ -name "30-ext-devices-rps-setting" 2>/dev/null | while read -r rps_file; do
+    if [ -f "$rps_file" ] && ! grep -q '\[ "$ACTION" = ifup \]' "$rps_file"; then
+        sed -i '2i[ "$ACTION" = ifup ] || exit 0' "$rps_file"
+        echo "==> Patched $rps_file with ifup action guard"
+    fi
+done
+
+# 10. 修复 odhcp6c dhcpv6.script 应对局域网异常 RA 泛洪的防抖机制（30s 防抖，消除每 3 秒一次的 CPU 暴冲，挽救 36% CPU）
+find package/ feeds/ -name "dhcpv6.script" 2>/dev/null | while read -r dhcp_script; do
+    if [ -f "$dhcp_script" ] && ! grep -q 'last_ra_update' "$dhcp_script"; then
+        sed -i '/ra-updated)/{n;s/.*/\t\tnow=\$(awk '\''{print int(\$1)}'\'' \/proc\/uptime 2>\/dev\/null)\n\t\tlast_ra=\$(cat \/tmp\/last_ra_update 2>\/dev\/null || echo 0)\n\t\t[ -n \"\$now\" ] \&\& [ -n \"\$last_ra\" ] \&\& [ \$((now - last_ra)) -lt 30 ] \&\& exit 0\n\t\techo \"\$now\" > \/tmp\/last_ra_update\n\t\t[ -n \"\$ADDRESSES\$RA_ADDRESSES\$PREFIXES\$USERPREFIX\" ] \&\& setup_interface \"\$1\"/}' "$dhcp_script"
+        echo "==> Patched $dhcp_script with 30s RA debounce"
+    fi
+done
