@@ -49,7 +49,8 @@ find package/ feeds/ -name "argon" -type f -path "*/etc/config/*" -exec sed -i "
 # 7. 提升 uhttpd 默认最大并发数为 20（解决后台并发请求排队卡顿）
 find package/ feeds/ -name "uhttpd.config" -exec sed -i "s/max_requests '3'/max_requests '20'/g" {} + 2>/dev/null || true
 
-# 8. 为 momo 服务脚本注入 Go 内存控制上限（40MB 内存上限，杜绝 Swap 颠簸）
+# 8. 为 momo 服务脚本注入 Go 内存控制上限（60MB 内存上限，实测平衡最佳性能与安全余量）
 if [ -d "package" ]; then
-    find package/ feeds/ -name "momo" -type f -path "*/init.d/*" -exec sed -i '/procd_open_instance/i \	export GOMEMLIMIT=40MiB\n\texport GOGC=30' {} + 2>/dev/null || true
+    find package/ feeds/ -name "momo" -type f -path "*/etc/config/*" -exec sed -i "s/option env_go_mem_limit '.*'/option env_go_mem_limit '60MiB'/g" {} + 2>/dev/null || true
+    find package/ feeds/ -name "momo" -type f -path "*/init.d/*" -exec sed -i '/procd_open_instance/i \	export GOMEMLIMIT=60MiB\n\texport GOGC=30' {} + 2>/dev/null || true
 fi
