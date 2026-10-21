@@ -68,4 +68,13 @@ done
 exit 0
 RCLOCAL
 
+# 6. ZRAM 内存压缩扩容调优 (zstd 高压缩比算法 + 192MB 稀疏压缩交换区)
+uci set system.@system[0].zram_size_mb='192'
+uci set system.@system[0].zram_comp_algo='zstd'
+uci commit system
+
+# 7. 每日凌晨 04:30 自动执行 ZRAM 内存空洞压缩整理（紧跟 04:00 momo 定时重启之后）
+mkdir -p /etc/crontabs
+(crontab -l 2>/dev/null | grep -v 'compact'; echo "30 4 * * * echo 1 > /sys/block/zram0/compact 2>/dev/null") | crontab -
+
 exit 0
