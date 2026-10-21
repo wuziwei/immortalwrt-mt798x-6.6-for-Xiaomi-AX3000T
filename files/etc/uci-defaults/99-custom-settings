@@ -17,13 +17,29 @@ set udpxy.@udpxy[0].max_clients='50'
 commit udpxy
 EOF
 
-# 3. 预置 momo 运行时健康堆内存上限 (90MiB，平衡内存安全与 GC 性能)
+# 3. 禁用系统自带独立 sing-box 服务自启（由 momo 独占调度管理，彻底杜绝双进程冲突与端口争抢）
+if [ -f /etc/init.d/sing-box ]; then
+    /etc/init.d/sing-box disable 2>/dev/null
+    /etc/init.d/sing-box stop 2>/dev/null
+fi
+rm -f /etc/rc.d/S*sing-box 2>/dev/null
+
+# 4. 预置 momo 纯核心模式、健康堆内存上限、定时重启与日志自动清理防爆
 uci -q batch <<EOF
+set momo.config.core_only='1'
 set momo.procd.env_go_mem_limit='90MiB'
+set momo.log.scheduled_clear='1'
+set momo.log.scheduled_clear_size_limit='1'
+set momo.log.scheduled_clear_size_limit_unit='MB'
+set momo.log.scheduled_clear_cron='*/5 * * * *'
+set momo.config.scheduled_restart='1'
+set momo.config.scheduled_restart_cron='0 4 * * *'
+add_list momo.proxy.reserved_ip='192.0.0.0/24'
 commit momo
 EOF
+mkdir -p /etc/momo/profiles
 
-# 4. 优化开机 rc.local：固化 IPv6 默认路由、防范 IPTV 组播泛洪打爆 Wi-Fi 空口、提升网卡队列
+# 5. 优化开机 rc.local：固化 IPv6 默认路由、防范 IPTV 组播泛洪打爆 Wi-Fi 空口、提升网卡队列
 cat << 'RCLOCAL' > /etc/rc.local
 # Put your custom commands here that should be executed once
 # the system init finished. By default this file does nothing.

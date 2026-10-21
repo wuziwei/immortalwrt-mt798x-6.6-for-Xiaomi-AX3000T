@@ -72,3 +72,9 @@ find package/ feeds/ -name "dhcpv6.script" 2>/dev/null | while read -r dhcp_scri
         echo "==> Patched $dhcp_script with 30s RA debounce"
     fi
 done
+
+# 11. 默认禁用系统自带的独立 sing-box 服务自启（确保开机仅由 momo 调度，防止端口与 TUN 网卡冲突）
+find package/ feeds/ -name "sing-box" -path "*/files/*" -type f -name "sing-box.init" 2>/dev/null | while read -r s_init; do
+    sed -i 's/^START=.*/START=99\nENABLED=0/g' "$s_init" 2>/dev/null || true
+    echo "==> Disabled autostart in $s_init"
+done
