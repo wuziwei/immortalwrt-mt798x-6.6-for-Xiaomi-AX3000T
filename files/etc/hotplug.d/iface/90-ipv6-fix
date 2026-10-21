@@ -1,0 +1,10 @@
+#!/bin/sh
+# 动态守护 IPv6 默认路由（防止接口重启或热插拔后丢失上游 IPv6 路由）
+[ "$ACTION" = ifup -o "$ACTION" = ifupdate ] || exit 0
+
+if [ "$INTERFACE" = "lan" ] || [ "$INTERFACE" = "lan6" ]; then
+    # 若内核 IPv6 路由表中缺失默认路由，则自动固化至 fe80::1
+    if ! ip -6 route show default 2>/dev/null | grep -q 'default'; then
+        ip -6 route replace default via fe80::1 dev br-lan 2>/dev/null
+    fi
+fi

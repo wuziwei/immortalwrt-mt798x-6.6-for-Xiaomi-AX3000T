@@ -23,6 +23,8 @@
 * **全链路网络性能调优**：
   * 提升核心网卡队列深度 `txqueuelen` 至 5000，消灭突发视频码流队列溢出丢包。
   * 核心套接字缓冲区扩充至 16MB，MTK 硬件加速下默认采用稳健的原生 `cubic` 拥塞控制。
+* **IPv6 开机固化与热插拔自愈**：
+  * **重启不丢 IPv6**：在 `rc.local` 与 `hotplug.d/iface` 中内置路由自愈守护，开机或接口重载时若未捕获到默认路由，自动固化恢复至 `fe80::1 dev br-lan`，彻底杜绝重启后丢失 IPv6 导致 sing-box IPv6 节点全断（`connect: network is unreachable`）及 IPv6 DDNS 失败的严重隐患。
 * **动态域名解析**：内置 **DDNS (动态 DNS)**，原生集成 Cloudflare、阿里云、腾讯云 DNSPod、DuckDNS 等服务脚本，完整支持 IPv4 / IPv6 双栈解析。
 * **开箱即用设计**：
   * **开机默认开启 Wi-Fi**：刷机后无需连网线插电脑，通电即自动发射 2.4G & 5G 无线信号。
