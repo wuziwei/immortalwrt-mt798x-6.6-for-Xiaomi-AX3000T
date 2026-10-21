@@ -29,9 +29,9 @@ git clone --depth 1 -b v1.15.0-alpha.12 https://github.com/SagerNet/sing-box.git
 git clone --depth 1 -b v1.15.0-alpha.12 https://ghfast.top/https://github.com/SagerNet/sing-box.git /tmp/sing-box-src
 
 cd /tmp/sing-box-src
-echo "==> Compiling stripped sing-box 1.15 for Linux ARM64..."
+echo "==> Compiling stripped sing-box 1.15 for Linux ARM64 with Tailscale..."
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build \
-  -tags "with_quic,with_wireguard,with_clash_api" \
+  -tags "with_quic,with_wireguard,with_clash_api,with_tailscale" \
   -trimpath \
   -ldflags "-s -w -buildid=" \
   -o /tmp/sing-box-bin \
