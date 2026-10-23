@@ -64,9 +64,8 @@ ip link set br-lan txqueuelen 5000 2>/dev/null
 ip link set rax0 txqueuelen 5000 2>/dev/null
 ip link set ra0 txqueuelen 5000 2>/dev/null
 
-# 4. 组播侦听与查询优化，自动设置有线端口多播路由器上行
-echo 1 > /sys/devices/virtual/net/br-lan/bridge/multicast_snooping 2>/dev/null
-echo 1 > /sys/devices/virtual/net/br-lan/bridge/multicast_querier 2>/dev/null
+# 4. 组播侦听与查询优化，保持网桥组播直通（避免 snooping 拦截 IPv6 NDP 邻居发现导致外网 IPv6 访问超时）
+echo 0 > /sys/devices/virtual/net/br-lan/bridge/multicast_snooping 2>/dev/null
 for eth_port in /sys/devices/virtual/net/br-lan/brif/lan* /sys/devices/virtual/net/br-lan/brif/wan*; do
     [ -d "$eth_port" ] && echo 2 > "$eth_port/multicast_router" 2>/dev/null
 done

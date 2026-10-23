@@ -15,9 +15,8 @@ if [ "$ACTION" = "add" ]; then
             [ -e /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router ] && echo 2 > /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router
             ;;
         br-lan)
-            # 确保主网桥启用 IGMP Snooping 与 Querier，并扩大网桥队列深度
-            echo 1 > /sys/devices/virtual/net/br-lan/bridge/multicast_snooping 2>/dev/null
-            echo 1 > /sys/devices/virtual/net/br-lan/bridge/multicast_querier 2>/dev/null
+            # 保持网桥组播直通（避免网桥 snooping 拦截 IPv6 NDP 邻居发现组播导致局域网设备 IPv6 访问超时），并扩大队列
+            echo 0 > /sys/devices/virtual/net/br-lan/bridge/multicast_snooping 2>/dev/null
             ip link set br-lan txqueuelen 5000 2>/dev/null
             # 加载自定义网络参数，防止网桥创建后默认参数被覆盖
             sysctl -p /etc/sysctl.d/99-custom-net-optimization.conf 2>/dev/null
