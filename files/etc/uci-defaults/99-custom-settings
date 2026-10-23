@@ -6,14 +6,17 @@ set network.globals.packet_steering='1'
 commit network
 EOF
 
-# 2. 预置 udpxy 4K 极速缓存参数 (2MB 缓冲区 + 128 批处理，消灭 4K 50fps 丢包与微卡顿)
+# 2. 预置 udpxy 4K 极速缓存参数 (2MB 满格缓冲区 + 128 批处理 + 2s 防抖 + -10 高优先级调度，消灭 4K 50fps 丢包与微卡顿)
 uci -q batch <<EOF
 set udpxy.@udpxy[0].disabled='0'
 set udpxy.@udpxy[0].port='4022'
+set udpxy.@udpxy[0].source='br-lan'
 set udpxy.@udpxy[0].buffer_size='2097152'
 set udpxy.@udpxy[0].buffer_messages='128'
 set udpxy.@udpxy[0].buffer_time='2'
 set udpxy.@udpxy[0].max_clients='50'
+set udpxy.@udpxy[0].mcsub_renew='60'
+set udpxy.@udpxy[0].nice_increment='-10'
 commit udpxy
 EOF
 
@@ -24,7 +27,7 @@ if [ -f /etc/init.d/sing-box ]; then
 fi
 rm -f /etc/rc.d/S*sing-box 2>/dev/null
 
-# 4. 预置 momo 纯核心模式、健康堆内存上限、定时重启与日志自动清理防爆
+# 4. 预置 momo 纯核心模式、健康堆内存上限、组播绝对绕行、定时重启与日志自动清理防爆
 uci -q batch <<EOF
 set momo.config.core_only='1'
 set momo.procd.env_go_mem_limit='90MiB'
@@ -35,9 +38,15 @@ set momo.log.scheduled_clear_cron='*/5 * * * *'
 set momo.config.scheduled_restart='1'
 set momo.config.scheduled_restart_cron='0 4 * * *'
 add_list momo.proxy.reserved_ip='192.0.0.0/24'
+add_list momo.proxy.reserved_ip='224.0.0.0/4'
+add_list momo.proxy.reserved_ip='239.0.0.0/8'
 commit momo
 EOF
 mkdir -p /etc/momo/profiles
+
+# 确保热插拔网卡脚本拥有执行权限
+chmod +x /etc/hotplug.d/net/99-multicast 2>/dev/null || true
+chmod +x /etc/hotplug.d/iface/90-ipv6-fix 2>/dev/null || true
 
 # 5. 优化开机 rc.local：固化 IPv6 默认路由、防范 IPTV 组播泛洪打爆 Wi-Fi 空口、提升网卡队列
 cat << 'RCLOCAL' > /etc/rc.local
@@ -47,19 +56,22 @@ cat << 'RCLOCAL' > /etc/rc.local
 # 1. 固化 IPv6 默认路由（开机自动恢复上游光猫/主网关链路本地地址，防止中继/桥接模式下开机丢失 IPv6 路由导致 sing-box v6 节点断网）
 ip -6 route replace default via fe80::1 dev br-lan 2>/dev/null
 
-# 2. 提升核心网卡队列深度为 5000，消除突发 30Mbps 码流丢包
+# 2. 重新加载高通量网络缓冲与 IPTV UDP 核心参数
+sysctl -p /etc/sysctl.d/99-custom-net-optimization.conf 2>/dev/null
+
+# 3. 提升核心网卡队列深度为 5000，消除突发 30Mbps 码流丢包
 ip link set br-lan txqueuelen 5000 2>/dev/null
 ip link set rax0 txqueuelen 5000 2>/dev/null
 ip link set ra0 txqueuelen 5000 2>/dev/null
 
-# 3. 组播侦听与查询优化，自动设置有线端口多播路由器上行
+# 4. 组播侦听与查询优化，自动设置有线端口多播路由器上行
 echo 1 > /sys/devices/virtual/net/br-lan/bridge/multicast_snooping 2>/dev/null
 echo 1 > /sys/devices/virtual/net/br-lan/bridge/multicast_querier 2>/dev/null
 for eth_port in /sys/devices/virtual/net/br-lan/brif/lan* /sys/devices/virtual/net/br-lan/brif/wan*; do
     [ -d "$eth_port" ] && echo 2 > "$eth_port/multicast_router" 2>/dev/null
 done
 
-# 4. Wi-Fi 无线接口屏蔽 IPTV 组播泛洪（由 udpxy 单播或有线端口传输，保护 5GHz/2.4GHz 芯片算力）
+# 5. Wi-Fi 无线接口屏蔽 IPTV 组播泛洪（由 udpxy 单播或有线端口传输，保护 5GHz/2.4GHz 芯片算力）
 for iface in ra0 rax0; do
     echo 0 > /sys/devices/virtual/net/br-lan/brif/$iface/multicast_router 2>/dev/null
     echo 0 > /sys/devices/virtual/net/br-lan/brif/$iface/multicast_to_unicast 2>/dev/null

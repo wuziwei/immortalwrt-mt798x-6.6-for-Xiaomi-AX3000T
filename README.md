@@ -15,9 +15,12 @@
   * 预装基于 sing-box 核心的轻量现代化客户端 **[OpenWrt-momo](https://github.com/nikkinikki-org/OpenWrt-momo)**，并在编译期编译专属轻量 sing-box 核心。
   * **开箱即用纯核心接管**：默认禁用系统自带独立 `sing-box` 服务的自启，彻底避免双服务启动冲突与端口争抢；默认开启 momo 纯核心模式（`core_only`），零篡改完整直通用户原生订阅。
   * **独家内存防暴冲补丁**：针对 15+ 庞大规则集常驻堆内存超过 60MB 的现状，科学预置 `90MiB` 堆缓冲并移除硬编码 GC 限制，预设日志自动循环清理，彻底根除 Go 垃圾回收器（GC Pacer）死循环抢占 CPU 导致的 80% 异常高负载。
-* **4K IPTV 零丢包与空口保护优化**：
-  * **极速缓冲 udpxy**：开箱预置 2MB 高速双向缓冲与 128 批处理（`-B 2097152 -R 128 -H 2`），彻底消灭 27+ Mbps 4K 50fps 超高清广播直播的偶发丢包与微卡顿。
-  * **Wi-Fi 空口组播风暴隔离**：开机自动关闭无线网卡上的组播路由泛洪与组播转单播，彻底保护 5GHz/2.4GHz 无线射频芯片算力。
+* **全链路 4K IPTV 零丢包与无线空口风暴免疫优化**：
+  * **内核级 UDP 接收缓冲区与内存池扩充**：将 Linux 内核 `net.core.rmem_max` 提升至 8MB、`rmem_default` 提升至 2MB，并扩充 `net.ipv4.udp_mem`，彻底消灭原生系统将缓冲区截断在 1MB 导致 4K/超高清 IPTV 组播突发（Burst）打爆 Socket 队列（`RcvbufErrors` 破万）引发的绿屏与大面积马赛克。
+  * **热插拔 Wi-Fi 组播风暴免疫系统 (`hotplug.d/net`)**：针对开源驱动或网页重置 Wi-Fi 后 `multicast_to_unicast` 被网桥强行复位成 `1` 从而引发空口泛洪雪崩的底层缺陷，内置热插拔守护钩子，在任何无线接口上线或重载时，永久锁定 `multicast_to_unicast = 0` 与 `multicast_router = 0`，杜绝 25Mbps+ 组播按无线客户端倍增拖垮 2.4G/5G 芯片算力。
+  * **高优先级进程调度 udpxy**：开箱预置 2MB 满格缓冲区、128 批处理与 2 秒平滑防抖（`-B 2097152 -R 128 -H 2`），并赋予 `-n -10` 高优先级 CPU 调度权，即便后台并发满速下载，IPTV 视频流也绝不受 CPU 调度饥饿影响。
+  * **网桥 Netfilter 绕行**：关闭内部网桥对 iptables/nftables 的额外调用（`net.bridge.bridge-nf-call-iptables = 0`），使高码率 25Mbps IPTV 流免受内核 Conntrack 连接跟踪表的无谓深层轮询，消除微观卡顿。
+  * **代理防火墙绝对绕行**：预置在 momo 保留地址中加入 `224.0.0.0/4` 和 `239.0.0.0/8` 组播网段，确保科学代理透明转发对 IPTV 组播流量绝对旁路，零额外开销。
 * **系统级防重载与 CPU 降温补丁**：
   * **修复 MTK SMP 热插拔死循环**：为 `30-ext-devices-rps-setting` 增加动作判断，根除局域网设备前缀变动时每 3 秒触发一次 `mtk_smp restart` 消耗 22% CPU 的顽疾。
   * **odhcp6c RA 30 秒防抖去重**：防御局域网异常三方设备（如部分运营商组网 AP/拓展器）高频广播 Router Solicitation/Advertisement 导致的脚本反复拉起（挽救 36% CPU）。
