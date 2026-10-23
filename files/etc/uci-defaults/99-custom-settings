@@ -1,8 +1,9 @@
 #!/bin/sh
 
-# 1. 开启网络封包调度加速与基础网络调优
+# 1. 开启网络封包调度加速与基础网络调优（显式禁用网桥 igmp_snooping 确保开机原生放行 IPv6 NDP 邻居发现）
 uci -q batch <<EOF
 set network.globals.packet_steering='1'
+set network.@device[0].igmp_snooping='0'
 commit network
 EOF
 
