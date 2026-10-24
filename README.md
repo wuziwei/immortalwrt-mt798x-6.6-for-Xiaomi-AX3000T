@@ -18,7 +18,7 @@
 * **全链路 4K IPTV 零丢包与无线空口风暴免疫优化**：
   * **内核级 UDP 接收缓冲区与内存池扩充**：将 Linux 内核 `net.core.rmem_max` 提升至 8MB、`rmem_default` 提升至 2MB，并扩充 `net.ipv4.udp_mem`，彻底消灭原生系统将缓冲区截断在 1MB 导致 4K/超高清 IPTV 组播突发（Burst）打爆 Socket 队列（`RcvbufErrors` 破万）引发的绿屏与大面积马赛克。
   * **热插拔 Wi-Fi 组播风暴免疫系统 (`hotplug.d/net`)**：针对开源驱动或网页重置 Wi-Fi 后 `multicast_to_unicast` 被网桥强行复位成 `1` 从而引发空口泛洪雪崩的底层缺陷，内置热插拔守护钩子，在任何无线接口上线或重载时，永久锁定 `multicast_to_unicast = 0` 与 `multicast_router = 0`，杜绝 25Mbps+ 组播按无线客户端倍增拖垮 2.4G/5G 芯片算力。
-  * **高优先级进程调度 udpxy**：开箱预置 2MB 满格缓冲区、128 批处理与 2 秒平滑防抖（`-B 2097152 -R 128 -H 2`），并赋予 `-n -10` 高优先级 CPU 调度权，即便后台并发满速下载，IPTV 视频流也绝不受 CPU 调度饥饿影响。
+  * **高性能多线程异步代理 msd_lite（淘汰 udpxy）**：开箱预置现代多线程 epoll 异步架构的 `msd_lite`，接管 `4022` 端口；配置 **8MB 环形大缓存** 与 **2MB Precache（预加载）**，彻底消除单线程阻塞与 Wi-Fi 抖动引发的内核缓冲区溢出（`RcvbufErrors`）；并在系统内置 `/www/iptv.m3u` 精细分类电台列表，支持 4K 超高清、潮汕地市台秒开无卡顿。
   * **网桥 Netfilter 绕行**：关闭内部网桥对 iptables/nftables 的额外调用（`net.bridge.bridge-nf-call-iptables = 0`），使高码率 25Mbps IPTV 流免受内核 Conntrack 连接跟踪表的无谓深层轮询，消除微观卡顿。
   * **代理防火墙绝对绕行**：预置在 momo 保留地址中加入 `224.0.0.0/4` 和 `239.0.0.0/8` 组播网段，确保科学代理透明转发对 IPTV 组播流量绝对旁路，零额外开销。
 * **系统级防重载与 CPU 降温补丁**：

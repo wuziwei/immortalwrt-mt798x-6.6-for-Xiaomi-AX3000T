@@ -1,24 +1,18 @@
 #!/bin/sh
-# 彻底杜绝 Wi-Fi 组播风暴与网络接口队列调优
+# 保持 Wi-Fi 与有线网口间的 IPv6 NDP 组播与组播直通（解法A）
 if [ "$ACTION" = "add" ]; then
     case "$DEVICENAME" in
         ra*|rax*)
-            # 永久禁用无线接口的组播转单播复制（杜绝 25Mbps 4K 组播按客户端倍增打爆无线空口）
             [ -e /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_to_unicast ] && echo 0 > /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_to_unicast
-            # 禁用向 Wi-Fi 接口转发未订阅组播路由报文
-            [ -e /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router ] && echo 0 > /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router
-            # 提升无线网卡发送队列深度，消灭瞬间码率尖峰丢包
+            [ -e /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router ] && echo 2 > /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router
             ip link set "$DEVICENAME" txqueuelen 5000 2>/dev/null
             ;;
         lan*|wan*)
-            # 将有线端口标记为组播路由器端口
             [ -e /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router ] && echo 2 > /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router
             ;;
         br-lan)
-            # 保持网桥组播直通（避免网桥 snooping 拦截 IPv6 NDP 邻居发现组播导致局域网设备 IPv6 访问超时），并扩大队列
             echo 0 > /sys/devices/virtual/net/br-lan/bridge/multicast_snooping 2>/dev/null
             ip link set br-lan txqueuelen 5000 2>/dev/null
-            # 加载自定义网络参数，防止网桥创建后默认参数被覆盖
             sysctl -p /etc/sysctl.d/99-custom-net-optimization.conf 2>/dev/null
             ;;
     esac

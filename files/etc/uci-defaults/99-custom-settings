@@ -7,19 +7,26 @@ set network.@device[0].igmp_snooping='0'
 commit network
 EOF
 
-# 2. 预置 udpxy 4K 极速缓存参数 (2MB 满格缓冲区 + 128 批处理 + 2s 防抖 + -10 高优先级调度，消灭 4K 50fps 丢包与微卡顿)
+# 2. 预置 msd_lite 高性能 4K/8K 环形大缓存参数 (8MB 环形接收缓存 + 2MB 预加载加速 + 5s 组播接收超时，接管 port 4022)
 uci -q batch <<EOF
-set udpxy.@udpxy[0].disabled='0'
-set udpxy.@udpxy[0].port='4022'
-set udpxy.@udpxy[0].source='br-lan'
-set udpxy.@udpxy[0].buffer_size='2097152'
-set udpxy.@udpxy[0].buffer_messages='128'
-set udpxy.@udpxy[0].buffer_time='2'
-set udpxy.@udpxy[0].max_clients='50'
-set udpxy.@udpxy[0].mcsub_renew='60'
-set udpxy.@udpxy[0].nice_increment='-10'
-commit udpxy
+set msd_lite.@instance[0].enabled='1'
+del_list msd_lite.@instance[0].address='0.0.0.0:7088'
+del_list msd_lite.@instance[0].address='[::]:7088'
+add_list msd_lite.@instance[0].address='0.0.0.0:4022'
+add_list msd_lite.@instance[0].address='[::]:4022'
+set msd_lite.@instance[0].network='lan'
+set msd_lite.@instance[0].precache_size='2048'
+set msd_lite.@instance[0].ring_buffer_size='8192'
+set msd_lite.@instance[0].multicast_recv_buffer_size='2048'
+set msd_lite.@instance[0].drop_slow_clients='0'
+set msd_lite.@instance[0].threads='2'
+set msd_lite.@instance[0].multicast_recv_timeout='5'
+commit msd_lite
 EOF
+if [ -f /etc/config/udpxy ]; then
+    uci -q set udpxy.@udpxy[0].disabled='1'
+    uci -q commit udpxy
+fi
 
 # 3. 禁用系统自带独立 sing-box 服务自启（由 momo 独占调度管理，彻底杜绝双进程冲突与端口争抢）
 if [ -f /etc/init.d/sing-box ]; then
