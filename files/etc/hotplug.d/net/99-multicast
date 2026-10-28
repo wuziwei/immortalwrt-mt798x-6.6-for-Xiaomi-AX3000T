@@ -1,11 +1,12 @@
 #!/bin/sh
-# 保持 Wi-Fi 与有线网口间的 IPv6 NDP 组播与组播直通（解法A）
+# 保持 Wi-Fi 与有线网口间的 IPv6 NDP 组播与组播直通，并彻底阻断 IPv4 组播淹没 Wi-Fi 空口
 if [ "$ACTION" = "add" ]; then
     case "$DEVICENAME" in
         ra*|rax*)
             [ -e /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_to_unicast ] && echo 0 > /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_to_unicast
-            [ -e /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router ] && echo 2 > /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router
+            [ -e /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router ] && echo 0 > /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router
             ip link set "$DEVICENAME" txqueuelen 5000 2>/dev/null
+            [ -x /etc/firewall.bridge.sh ] && /etc/firewall.bridge.sh
             ;;
         lan*|wan*)
             [ -e /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router ] && echo 2 > /sys/devices/virtual/net/br-lan/brif/$DEVICENAME/multicast_router
@@ -14,6 +15,7 @@ if [ "$ACTION" = "add" ]; then
             echo 0 > /sys/devices/virtual/net/br-lan/bridge/multicast_snooping 2>/dev/null
             ip link set br-lan txqueuelen 5000 2>/dev/null
             sysctl -p /etc/sysctl.d/99-custom-net-optimization.conf 2>/dev/null
+            [ -x /etc/firewall.bridge.sh ] && /etc/firewall.bridge.sh
             ;;
     esac
 fi
