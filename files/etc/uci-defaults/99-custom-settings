@@ -38,7 +38,7 @@ rm -f /etc/rc.d/S*sing-box 2>/dev/null
 # 4. 预置 momo 纯核心模式、健康堆内存上限、组播绝对绕行、定时重启与日志自动清理防爆
 uci -q batch <<EOF
 set momo.config.core_only='1'
-set momo.procd.env_go_mem_limit='50MiB'
+set momo.procd.env_go_mem_limit='90MiB'
 set momo.log.scheduled_clear='1'
 set momo.log.scheduled_clear_size_limit='1'
 set momo.log.scheduled_clear_size_limit_unit='MB'
