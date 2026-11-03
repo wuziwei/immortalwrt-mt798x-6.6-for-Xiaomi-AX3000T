@@ -38,7 +38,7 @@ rm -f /etc/rc.d/S*sing-box 2>/dev/null
 # 4. 预置 momo 纯核心模式、健康堆内存上限、组播绝对绕行、定时重启与日志自动清理防爆
 uci -q batch <<EOF
 set momo.config.core_only='1'
-set momo.procd.env_go_mem_limit='90MiB'
+set momo.procd.env_go_mem_limit='50MiB'
 set momo.log.scheduled_clear='1'
 set momo.log.scheduled_clear_size_limit='1'
 set momo.log.scheduled_clear_size_limit_unit='MB'
@@ -106,5 +106,13 @@ uci commit system
 # 7. 每日凌晨 04:30 自动执行 ZRAM 内存空洞压缩整理（紧跟 04:00 momo 定时重启之后）
 mkdir -p /etc/crontabs
 (crontab -l 2>/dev/null | grep -v 'compact'; echo "30 4 * * * echo 1 > /sys/block/zram0/compact 2>/dev/null") | crontab -
+
+# 8. 预置 Wi-Fi 双频合一（统一 SSID 为 WZW-5G）并开启 802.11k 快速漫游辅助
+uci -q batch <<EOF
+set wireless.default_MT7981_1_1.ssid='WZW-5G'
+set wireless.default_MT7981_1_1.ieee80211k='1'
+set wireless.default_MT7981_1_2.ieee80211k='1'
+commit wireless
+EOF
 
 exit 0
