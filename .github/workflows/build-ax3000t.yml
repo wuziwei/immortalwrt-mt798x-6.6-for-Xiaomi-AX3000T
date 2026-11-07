@@ -6,6 +6,18 @@ on:
       manual:
         description: 'Manual Trigger'
         default: 'true'
+  push:
+    branches:
+      - main
+    paths:
+      - 'ax3000t.config'
+      - 'files/**'
+      - 'diy-part*.sh'
+      - '.github/workflows/build-ax3000t.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
