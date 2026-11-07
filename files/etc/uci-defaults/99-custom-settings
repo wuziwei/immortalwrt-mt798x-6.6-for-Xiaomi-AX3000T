@@ -7,6 +7,14 @@ set network.@device[0].igmp_snooping='0'
 commit network
 EOF
 
+# 1.1 系统级维护优化与别名 (iperf3 绑定 Core 1 防网卡中断争抢、wget 禁用 HSTS、静默 dnsmasq 冗余日志、xupnpd 挂载 IPTV)
+sed -i '/iperf3=/d' /etc/profile 2>/dev/null || true
+echo "alias iperf3='iperf3 -A 1'" >> /etc/profile
+echo "hsts=0" > /root/.wgetrc
+grep -q "log-facility=/dev/null" /etc/dnsmasq.conf 2>/dev/null || echo "log-facility=/dev/null" >> /etc/dnsmasq.conf
+mkdir -p /usr/share/xupnpd/playlists
+[ -f /www/iptv.m3u ] && ln -sf /www/iptv.m3u /usr/share/xupnpd/playlists/iptv.m3u 2>/dev/null || true
+
 # 2. 预置 msd_lite 高性能 4K/8K 环形大缓存参数 (8MB 环形接收缓存 + 2MB 预加载加速 + 5s 组播接收超时，接管 port 4022)
 uci -q batch <<EOF
 set msd_lite.@instance[0].enabled='1'
@@ -103,9 +111,11 @@ uci set system.@system[0].zram_size_mb='192'
 uci set system.@system[0].zram_comp_algo='zstd'
 uci commit system
 
-# 7. 每日凌晨 04:30 自动执行 ZRAM 内存空洞压缩整理（紧跟 04:00 momo 定时重启之后）
+# 7. 每日维护定时任务：凌晨 02:00 清空 msd_lite 组播日志防爆内存，04:30 自动执行 ZRAM 内存整理
 mkdir -p /etc/crontabs
-(crontab -l 2>/dev/null | grep -v 'compact'; echo "30 4 * * * echo 1 > /sys/block/zram0/compact 2>/dev/null") | crontab -
+(crontab -l 2>/dev/null | grep -v 'compact' | grep -v 'msd_lite'; \
+ echo "30 4 * * * echo 1 > /sys/block/zram0/compact 2>/dev/null"; \
+ echo "0 2 * * * echo \"\" > /tmp/log/msd_lite.log 2>/dev/null") | crontab -
 
 # 8. 预置 Wi-Fi 双频合一（统一 SSID 为 WZW-5G）并开启 802.11k 快速漫游辅助
 uci -q batch <<EOF
